@@ -1194,48 +1194,71 @@
 
     // Creating a Backbone.View creates its initial element outside of the DOM,
     // if an existing element is not provided...
+    // Backbone Views 常常比他们真正所编写的代码更常规. A View
+    // 一个 视图 是一个简单的在Dom代理 UI逻辑块的JavaScript对象
+    // 它可能是一个简单的项目, 一个完整的列表, 一个侧栏或者面板, 甚至是包含你所用应用的环境框架
+    // 定义一块 UI 来作为一个 **View** 就允许你用声明方式定义DOM事件,
+    // 无需担心渲染顺序 ... 并且能很容易让视图对你模型状态变化时做出反应。
+
+    // 创建一个DOM以外初始化的 Backbone.View 元素,
+    // 如果现有环境不提供...
     var View = Backbone.View = function (options) {
+        // 为每一个视图对象创建一个唯一标识, 前缀为"view"
         this.cid = _.uniqueId('view');
         options || (options = {});
         _.extend(this, _.pick(options, viewOptions));
+        //根据this.el是否被赋值，做一些处理
         this._ensureElement();
+        //初始化时调用initialize方法，并且this指向backbone view
         this.initialize.apply(this, arguments);
     };
 
     // Cached regex to split keys for `delegate`.
+    //一个正则，匹配未被空格、换行等分隔符分隔的字符串，或者以空格、换行等分隔符分隔为2段的字符串
     var delegateEventSplitter = /^(\S+)\s*(.*)$/;
 
     // List of view options to be merged as properties.
+    // viewOptions列表记录一些列属性名, 在构造视图对象时, 如果传递的配置项中包含这些名称, 则将属性复制到对象本身
     var viewOptions = ['model', 'collection', 'el', 'id', 'attributes', 'className', 'tagName', 'events'];
 
     // Set up all inheritable **Backbone.View** properties and methods.
     _.extend(View.prototype, Events, {
 
         // The default `tagName` of a View's element is `"div"`.
+        // 如果在创建视图对象时, 没有设置指定的el元素, 则会通过make方法创建一个元素, tagName为创建元素的默认标签
         tagName: 'div',
 
         // jQuery delegate for element lookup, scoped to DOM elements within the
         // current view. This should be preferred to global lookups where possible.
+        // 相当于jq的find方法，用于查找元素
+        // 每个视图中都具有一个$选择器方法, 该方法与jQuery或Zepto类似, 通过传递一个表达式来获取元素
+        // 但该方法只会在视图对象的$el元素范围内进行查找, 因此会提高匹配效率
         $: function (selector) {
             return this.$el.find(selector);
         },
 
         // Initialize is an empty function by default. Override it with your own
         // initialization logic.
+        // 初始化方法, 在对象被实例化后自动调用
         initialize: function () {
         },
 
         // **render** is the core function that your view should override, in order
         // to populate its element (`this.el`), with the appropriate HTML. The
         // convention is for **render** to always return `this`.
+        // render方法与initialize方法类似, 默认没有实现任何逻辑
+        // 一般会重载该方法, 以实现对视图中元素的渲染
         render: function () {
             return this;
         },
 
         // Remove this view by taking the element out of the DOM, and removing any
         // applicable Backbone.Events listeners.
+        // 移除当前视图的$el元素
         remove: function () {
+            // 移除当前视图的$el元素
             this._removeElement();
+            // 删除绑定的事件，释放内存
             this.stopListening();
             return this;
         },
@@ -1243,13 +1266,17 @@
         // Remove this view's element from the document and all event listeners
         // attached to it. Exposed for subclasses using an alternative DOM
         // manipulation API.
+        // 移除当前视图的$el元素
         _removeElement: function () {
+            // 通过调用jQuery或Zepto的remove方法, 因此在第三方库中会同时移除该元素绑定的所有事件和数据
             this.$el.remove();
         },
 
         // Change the view's element (`this.el` property) and re-delegate the
         // view's events on the new element.
+        // 为视图对象设置标准的$el及el属性, 该方法在对象创建时被自动调用
         setElement: function (element) {
+            //先取消el的事件绑定
             this.undelegateEvents();
             this._setElement(element);
             this.delegateEvents();
@@ -1262,7 +1289,10 @@
         // this to utilize an alternative DOM manipulation API and are only required
         // to set the `this.el` property.
         _setElement: function (el) {
+            // this.$el 存放Jquery或其他库的示例对象
+            // 将元素创建为jQuery或Zepto对象, 并存放在$el属性中
             this.$el = el instanceof Backbone.$ ? el : Backbone.$(el);
+            // this.el存放标准的DOM对象 熟悉jq的话 应该都清楚
             this.el = this.$el[0];
         },
 
@@ -1279,14 +1309,31 @@
         // pairs. Callbacks will be bound to the view, with `this` set properly.
         // Uses event delegation for efficiency.
         // Omitting the selector binds the event to `this.el`.
+        // 为视图元素绑定事件
+        // events参数配置了需要绑定事件的集合, 格式如('事件名称 元素选择表达式' : '事件方法名称/或事件函数'):
+        // {
+        //     'click #title': 'edit',
+        //     'click .save': 'save'
+        //     'click span': function() {}
+        // }
+        // 该方法在视图对象初始化时会被自动调用, 并将对象中的events属性作为events参数(事件集合)
         delegateEvents: function (events) {
+            // 如果没有手动传递events参数, 则从视图对象获取events属性作为事件集合
             if (!(events || (events = _.result(this, 'events')))) return this;
+            // 取消当前已经绑定过的events事件 避免重复绑定导致事件执行多次
             this.undelegateEvents();
+            // 遍历需要绑定的事件列表
             for (var key in events) {
+                // 获取需要绑定的方法(允许是方法名称或函数)
                 var method = events[key];
+                // 如果是方法名称, 则从对象中获取该函数对象, 因此该方法名称必须是视图对象中已定义的方法
                 if (!_.isFunction(method)) method = this[events[key]];
                 if (!method) continue;
+                // 解析事件表达式(key), 从表达式中解析出事件的名字和需要操作的元素
+                // 例如 'click #title'将被解析为 'click' 和 '#title' 两部分, 均存放在match数组中
                 var match = key.match(delegateEventSplitter);
+                // match[1]为解析后的事件名称
+                // match[2]为解析后的事件元素选择器表达式
                 this.delegate(match[1], match[2], _.bind(method, this));
             }
             return this;
@@ -1295,6 +1342,7 @@
         // Add a single event listener to the view's element (or a child element
         // using `selector`). This only works for delegate-able events: not `focus`,
         // `blur`, and not `change`, `submit`, and `reset` in Internet Explorer.
+        // jq的事件委派
         delegate: function (eventName, selector, listener) {
             this.$el.on(eventName + '.delegateEvents' + this.cid, selector, listener);
         },
@@ -1302,7 +1350,12 @@
         // Clears all callbacks previously bound to the view by `delegateEvents`.
         // You usually don't need to use this, but may wish to if you have multiple
         // Backbone views attached to the same DOM element.
+        // 取消视图中当前元素绑定的events事件, 该方法一般不会被使用
+        // 除非调用delegateEvents方法重新为视图中的元素绑定事件, 在重新绑定之前会清除当前的事件
+        // 或通过setElement方法重新设置试图的el元素, 也会清除当前元素的事件
         undelegateEvents: function () {
+            // 如果已经存在了$el属性(可能是手动调用了setElement方法切换视图的元素),
+            // 则取消之前对$el绑定的events事件(详细参考undelegateEvents方法)
             if (this.$el) this.$el.off('.delegateEvents' + this.cid);
             return this;
         },
@@ -1323,14 +1376,26 @@
         // If `this.el` is a string, pass it through `$()`, take the first
         // matching element, and re-assign it to `el`. Otherwise, create
         // an element from the `id`, `className` and `tagName` properties.
+        // 每一个视图对象都应该有一个el元素, 作为渲染的元素
+        // 在构造视图时, 可以设置对象的el属性来指定一个元素
+        // 如果设置的el是一个字符串或DOM对象, 则通过$方法将其创建为一个jQuery或Zepto对象
+        // 如果没有设置el属性, 则根据传递的tagName, id和className, 调用_createElement方法创建一个元素
+        // (新创建的元素不会被添加到文档树中, 而始终存储在内存, 当处理完毕需要渲染到页面时, 一般会在重写的render方法, 或自定义方法中, 访问this.el将其追加到文档)
+        // (如果我们需要向页面添加一个目前还没有的元素, 并且需要为其添加一些子元素, 属性, 样式或事件时, 可以通过该方式先将元素创建到内存, 在完成所有操作之后再手动渲染到文档, 可以提高渲染效率)
         _ensureElement: function () {
+            // 如果没有设置el属性, 则创建默认元素
             if (!this.el) {
+                // 从对象获取attributes属性, 作为新创建元素的默认属性列表
                 var attrs = _.extend({}, _.result(this, 'attributes'));
+                // 设置新元素的id
                 if (this.id) attrs.id = _.result(this, 'id');
+                // 设置新元素的class
                 if (this.className) attrs['class'] = _.result(this, 'className');
+                // 通过_createElement方法创建元素, 并调用setElement方法将元素设置为视图所使用的标准元素
                 this.setElement(this._createElement(_.result(this, 'tagName')));
                 this._setAttributes(attrs);
             } else {
+                // 如果设置了el属性, 则直接调用setElement方法将el元素设置为视图的标准元素
                 this.setElement(_.result(this, 'el'));
             }
         },
@@ -1365,26 +1430,31 @@
         var type = methodMap[method];
 
         // Default options, unless specified.
+        // 相当于jq的 extend，合并默认值
         _.defaults(options || (options = {}), {
             emulateHTTP: Backbone.emulateHTTP,
             emulateJSON: Backbone.emulateJSON
         });
 
         // Default JSON-request options.
+        // 默认使用json的数据格式
         var params = {type: type, dataType: 'json'};
 
         // Ensure that we have a URL.
+        // 如果不存在url的话 则获取model里面的url设置 ，如果还是没有 则抛出异常
         if (!options.url) {
             params.url = _.result(model, 'url') || urlError();
         }
 
         // Ensure that we have the appropriate request data.
+        // 确保我们有正确的请求数据.
         if (options.data == null && model && (method === 'create' || method === 'update' || method === 'patch')) {
             params.contentType = 'application/json';
             params.data = JSON.stringify(options.attrs || model.toJSON(options));
         }
 
         // For older servers, emulate JSON by encoding the request into an HTML-form.
+        // 对于老的服务器, 模拟JSON以HTML形式的.
         if (options.emulateJSON) {
             params.contentType = 'application/x-www-form-urlencoded';
             params.data = params.data ? {model: params.data} : {};
@@ -1392,6 +1462,8 @@
 
         // For older servers, emulate HTTP by mimicking the HTTP method with `_method`
         // And an `X-HTTP-Method-Override` header.
+        // 对于老的服务器, 模拟 HTTP 通过用 `_method` 方法仿造 HTTP
+        // 和一个 `X-HTTP-Method-Override` 头.
         if (options.emulateHTTP && (type === 'PUT' || type === 'DELETE' || type === 'PATCH')) {
             params.type = 'POST';
             if (options.emulateJSON) params.data._method = type;
@@ -1403,11 +1475,13 @@
         }
 
         // Don't process data on a non-GET request.
+        // 在 non-GET 请求中不传递数据.
         if (params.type !== 'GET' && !options.emulateJSON) {
             params.processData = false;
         }
 
         // Pass along `textStatus` and `errorThrown` from jQuery.
+        // 先缓存error 然后设置默认的error处理逻辑，最后再调用error
         var error = options.error;
         options.error = function (xhr, textStatus, errorThrown) {
             options.textStatus = textStatus;
@@ -1416,12 +1490,14 @@
         };
 
         // Make the request, allowing the user to override any Ajax options.
+        //提出请求, 允许用户自定义Ajax选项.
         var xhr = options.xhr = Backbone.ajax(_.extend(params, options));
         model.trigger('request', model, xhr, options);
         return xhr;
     };
 
     // Map from CRUD to HTTP for our default `Backbone.sync` implementation.
+    // 映射 CRUD 到 HTTP 为了默认的 `Backbone.sync` 执行.
     var methodMap = {
         'create': 'POST',
         'update': 'PUT',
@@ -1432,6 +1508,8 @@
 
     // Set the default implementation of `Backbone.ajax` to proxy through to `$`.
     // Override this if you'd like to use a different library.
+    // 通过 `$` 代理来设置 `Backbone.ajax` 的默认执行.
+    // 如果想要使用另一个库那么重载它.
     Backbone.ajax = function () {
         return Backbone.$.ajax.apply(Backbone.$, arguments);
     };
@@ -1441,6 +1519,8 @@
 
     // Routers map faux-URLs to actions, and fire events when routes are
     // matched. Creating a new one sets its `routes` hash, if not set statically.
+    // 路由映射 faux-URLs 到 actions, 当路由匹配后触发事件
+    // 如果还没有静态的设置，创建一个新的 `router` 哈希.
     var Router = Backbone.Router = function (options) {
         options || (options = {});
         if (options.routes) this.routes = options.routes;
@@ -1450,6 +1530,7 @@
 
     // Cached regular expressions for matching named param parts and splatted
     // parts of route strings.
+    // 缓存匹配名称参数和路由字符串分割的正则表达式
     var optionalParam = /\((.*?)\)/g;
     var namedParam = /(\(\?)?:\w+/g;
     var splatParam = /\*\w+/g;
@@ -1469,12 +1550,19 @@
         //       ...
         //     });
         //
+        // 手动绑定回调函数到单个路由名称. 例如:
+        //
+        //     this.route('search/:query/p:num', 'search', function(query, num) {
+        //       ...
+        //     });
+        //
         route: function (route, name, callback) {
             if (!_.isRegExp(route)) route = this._routeToRegExp(route);
             if (_.isFunction(name)) {
                 callback = name;
                 name = '';
             }
+            //如果callback不存在，则调用name方法
             if (!callback) callback = this[name];
             var router = this;
             Backbone.history.route(route, function (fragment) {
@@ -1495,6 +1583,7 @@
         },
 
         // Simple proxy to `Backbone.history` to save a fragment into the history.
+        // 将`Backbone.history`作为代理来保存片段到 history.
         navigate: function (fragment, options) {
             Backbone.history.navigate(fragment, options);
             return this;
@@ -1503,6 +1592,8 @@
         // Bind all defined routes to `Backbone.history`. We have to reverse the
         // order of the routes here to support behavior where the most general
         // routes can be defined at the bottom of the route map.
+        // 绑定所有定义了的路由到 `Backbone.history`.
+        // 在此我们需要调转路由的顺序来支持普通路由在路由映射底部定义的情况
         _bindRoutes: function () {
             if (!this.routes) return;
             this.routes = _.result(this, 'routes');
@@ -1514,6 +1605,7 @@
 
         // Convert a route string into a regular expression, suitable for matching
         // against the current location hash.
+        // 将路由字符串转换到适合匹配当前 location hash的正则表达式
         _routeToRegExp: function (route) {
             route = route.replace(escapeRegExp, '\\$&')
                 .replace(optionalParam, '(?:$1)?')
@@ -1527,6 +1619,8 @@
         // Given a route, and a URL fragment that it matches, return the array of
         // extracted decoded parameters. Empty or unmatched parameters will be
         // treated as `null` to normalize cross-browser behavior.
+        // 给一个 路由, 当URL的片段匹配后, 返回匹配到的解码后的参数数组.
+        // 空或者不匹配的参数会被作为 null 来对待保证跨浏览器兼容
         _extractParameters: function (route, fragment) {
             var params = route.exec(fragment).slice(1);
             return _.map(params, function (param, i) {
@@ -1843,6 +1937,7 @@
     };
 
     // Set up inheritance for the model, collection, router, view and history.
+    //TODO http://www.cnblogs.com/snandy/archive/2013/05/27/3097429.html
     Model.extend = Collection.extend = Router.extend = View.extend = History.extend = extend;
 
     // Throw an error when a URL is needed, and none is supplied.
