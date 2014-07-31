@@ -1426,6 +1426,25 @@
     // instead of `application/json` with the model in a param named `model`.
     // Useful when interfacing with server-side languages like **PHP** that make
     // it difficult to read the body of `PUT` requests.
+
+    // Backbone.sync  同步
+    // -------------
+
+    // 重载这个方法来改变 Backbone 持久模型在服务器中的方式、
+    // 通过请求类型和问题中的模型
+    // 默认情况发送 RESTful Ajax 请求到模型中的`url()`.
+    // 一些可行的自定义为:
+    //
+    // * 使用 `setTimeout` 在一个请求中批量的触发更新.
+    // * 发送 XML 而不是 JSON.
+    // * 坚持模型通过 WebSockets 而不是 Ajax.
+    //
+    // 开启 `Backbone.emulateHTTP` 为像 `POST` 一样发送 `PUT` 和 `DELETE` 请求
+    // `_method` 参数中包含真正的 HTTP 方法,
+    // 以及主体的所有请求 as `application/x-www-form-urlencoded`
+    // 替换为 `application/json`参数名为 `model`的模块.
+    // 当接口为服务器端语言，如**PHP**时很有用， 使得主体的'PUT'请求难以读取
+    // 实际调用Backbone.ajax 请求
     Backbone.sync = function (method, model, options) {
         var type = methodMap[method];
 
