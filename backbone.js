@@ -346,6 +346,7 @@
     // 使用指定的属性创建一个新的模型.
     // 会自动生成并分配一个用户id (`cid`)
     var Model = Backbone.Model = function (attributes, options) {
+//        debugger;
         //设置model的默认参数，如果不传的话，默认都是空对象
         var attrs = attributes || {};       //attrs也相当于是model的实例属性，一般对应于数据库的字段
         options || (options = {});// 配置项
@@ -1550,10 +1551,10 @@
     // Cached regular expressions for matching named param parts and splatted
     // parts of route strings.
     // 缓存匹配名称参数和路由字符串分割的正则表达式
-    var optionalParam = /\((.*?)\)/g;
-    var namedParam = /(\(\?)?:\w+/g;
-    var splatParam = /\*\w+/g;
-    var escapeRegExp = /[\-{}\[\]+?.,\\\^$|#\s]/g;
+    var optionalParam = /\((.*?)\)/g;                   // 规则中的括号部分 也就是可有可没有的部分
+    var namedParam = /(\(\?)?:\w+/g;                    // 将不带括号部分的 但是:...形式的进行替换可以匹配为非/以外任意字符
+    var splatParam = /\*\w+/g;                          // 将*...形式的替换为除换行以外的任何字符匹配.*
+    var escapeRegExp = /[\-{}\[\]+?.,\\\^$|#\s]/g;      // 将 - { } [ ] + ? . , \ ^ $ # 空格 等进行转义
 
     // Set up all inheritable **Backbone.Router** properties and methods.
     _.extend(Router.prototype, Events, {
@@ -1589,6 +1590,7 @@
                 if (router.execute(callback, args, name) !== false) {
                     router.trigger.apply(router, ['route:' + name].concat(args));
                     router.trigger('route', name, args);
+                    // 触发history的route事件
                     Backbone.history.trigger('route', router, name, args);
                 }
             });
@@ -1625,6 +1627,7 @@
         // Convert a route string into a regular expression, suitable for matching
         // against the current location hash.
         // 将路由字符串转换到适合匹配当前 location hash的正则表达式
+        // 将route字符串转成正则表达式
         _routeToRegExp: function (route) {
             route = route.replace(escapeRegExp, '\\$&')
                 .replace(optionalParam, '(?:$1)?')
@@ -1632,7 +1635,7 @@
                     return optional ? match : '([^/?]+)';
                 })
                 .replace(splatParam, '([^?]*?)');
-            return new RegExp('^' + route + '(?:\\?([\\s\\S]*))?$');
+            return new RegExp('^' + route + '(?:\\?([\\s\\S]*))?$');// 构建正则 加上 开始^和结束$
         },
 
         // Given a route, and a URL fragment that it matches, return the array of
@@ -1687,6 +1690,7 @@
 
         // The default interval to poll for hash changes, if necessary, is
         // twenty times a second.
+        // hash更改的事件间隔 针对旧式浏览器
         interval: 50,
 
         // Are we at the app root?
@@ -1711,6 +1715,7 @@
         },
 
         // Get the cross-browser normalized URL fragment from the path or hash.
+        // 跨浏览器的得到URL片段 不管是URL hash 或其他
         getFragment: function (fragment) {
             if (fragment == null) {
                 if (this._hasPushState || !this._wantsHashChange) {
@@ -1724,6 +1729,7 @@
 
         // Start the hash change handling, returning `true` if the current URL matches
         // an existing route, and `false` otherwise.
+        // 开始监听hash change事件（兼容性）
         start: function (options) {
             if (History.started) throw new Error('Backbone.history has already been started');
             History.started = true;
@@ -1734,7 +1740,7 @@
             this.root = this.options.root;
             this._wantsHashChange = this.options.hashChange !== false;
             this._hasHashChange = 'onhashchange' in window;
-            this._wantsPushState = !!this.options.pushState;
+            this._wantsPushState = !!this.options.pushState;        // 是否采用popstate修改地址栏地址
             this._hasPushState = !!(this.options.pushState && this.history && this.history.pushState);
             this.fragment = this.getFragment();
 
@@ -1744,6 +1750,7 @@
             };
 
             // Normalize root to always include a leading and trailing slash.
+            // 规范化root中含有头和尾的斜杠.
             this.root = ('/' + this.root + '/').replace(rootStripper, '/');
 
             // Proxy an iframe to handle location events if the browser doesn't
@@ -1794,6 +1801,8 @@
 
         // Disable Backbone.history, perhaps temporarily. Not useful in a real app,
         // but possibly useful for unit testing Routers.
+        // 关闭 Backbone.history, 可能暂时性.
+        // 在真实应用中无用，但是在单元测试中有用.
         stop: function () {
             // Add a cross-platform `removeEventListener` shim for older browsers.
             var removeEventListener = window.removeEventListener || function (eventName, listener) {
@@ -1820,12 +1829,16 @@
 
         // Add a route to be tested when the fragment changes. Routes added later
         // may override previous routes.
+        // 当一个框架改变的时候添加一个测试路由.
+        // 路由添加后可能会重写之前的路由.
         route: function (route, callback) {
             this.handlers.unshift({route: route, callback: callback});
         },
 
         // Checks the current URL to see if it has changed, and if it has,
         // calls `loadUrl`, normalizing across the hidden iframe.
+        // 检测当前的URL是否有改变,
+        // 如果有，调用 `loadUrl`, 规范隐藏的iframe.
         checkUrl: function (e) {
             var current = this.getFragment();
             if (current === this.fragment && this.iframe) {
@@ -1839,6 +1852,8 @@
         // Attempt to load the current URL fragment. If a route succeeds with a
         // match, returns `true`. If no defined routes matches the fragment,
         // returns `false`.
+        // 尝试加载当前的URL片段. 如果路由匹配成功则返回`true`.
+        // 定义的路由不能匹配片段时返回 `false`.
         loadUrl: function (fragment) {
             fragment = this.fragment = this.getFragment(fragment);
             return _.any(this.handlers, function (handler) {
@@ -1856,6 +1871,12 @@
         // The options object can contain `trigger: true` if you wish to have the
         // route callback be fired (not usually desirable), or `replace: true`, if
         // you wish to modify the current URL without adding an entry to the history.
+        // 保存片段至 hash history,
+        // 或者，如果'replace' 参数传递了就替换URL的状态.
+        // 你需要确保提前进行URL编码.
+        //
+        // 对象的选项包括 `trigger: true` 如果你希望有路由的回调函数被触发（不理想）
+        // `replace: true`, 如果你希望修改当前的URL但是不添加到 history
         navigate: function (fragment, options) {
             if (!History.started) return false;
             if (!options || options === true) options = {trigger: !!options};
@@ -1872,6 +1893,7 @@
             if (fragment === '' && url !== '/') url = url.slice(0, -1);
 
             // If pushState is available, we use it to set the fragment as a real URL.
+            // 如果支持 pushState , 使用片段作为 a real URL.
             if (this._hasPushState) {
                 this.history[options.replace ? 'replaceState' : 'pushState']({}, document.title, url);
 
@@ -1883,6 +1905,8 @@
                     // Opening and closing the iframe tricks IE7 and earlier to push a
                     // history entry on hash-tag change.  When replace is true, we don't
                     // want this.
+                    // 在IE7 和更早的版本中用打开关闭iframe是推入history来实现hash-tag变化
+                    // 我们不希望它真正替换
                     if (!options.replace) this.iframe.document.open().close();
                     this._updateHash(this.iframe.location, fragment, options.replace);
                 }
@@ -1897,6 +1921,7 @@
 
         // Update the hash location, either replacing the current entry, or adding
         // a new one to the browser history.
+        // 更新location的 hash, 取代当前的 entry, 或者向浏览器history添加一个新的.
         _updateHash: function (location, fragment, replace) {
             if (replace) {
                 var href = location.href.replace(/(javascript:|#).*$/, '');
@@ -1918,6 +1943,8 @@
     // Helper function to correctly set up the prototype chain, for subclasses.
     // Similar to `goog.inherits`, but uses a hash of prototype properties and
     // class properties to be extended.
+    // Helper 函数 为子类正确的设置原型链.
+    // 与`goog.inherits`类似, 但是使用原型属性和类属性的hash形式进行拓展
     var extend = function (protoProps, staticProps) {
         var parent = this;
         var child;
@@ -1925,6 +1952,8 @@
         // The constructor function for the new subclass is either defined by you
         // (the "constructor" property in your `extend` definition), or defaulted
         // by us to simply call the parent's constructor.
+        // 由你定义的构造函数或者简单的有我们的父类构造函数创建新子类
+        // ( "constructor" 的属性是有你来扩展定义的)
         if (protoProps && _.has(protoProps, 'constructor')) {
             child = protoProps.constructor;
         } else {
@@ -1934,10 +1963,12 @@
         }
 
         // Add static properties to the constructor function, if supplied.
+        // 如果提供，给构造函数添加静态属性.
         _.extend(child, parent, staticProps);
 
         // Set the prototype chain to inherit from `parent`, without calling
         // `parent`'s constructor function.
+        // 设置原型链用 `parent`的原型,不调用`parent`的构造函数
         var Surrogate = function () {
             this.constructor = child;
         };
@@ -1946,10 +1977,12 @@
 
         // Add prototype properties (instance properties) to the subclass,
         // if supplied.
+        // 如果提供了，给子类添加原型属性 (替代 属性)
         if (protoProps) _.extend(child.prototype, protoProps);
 
         // Set a convenience property in case the parent's prototype is needed
         // later.
+        // 设置一个方便的属性来处理之后父类的原型在之后可能被引用的情况
         child.__super__ = parent.prototype;
 
         return child;
@@ -1960,11 +1993,13 @@
     Model.extend = Collection.extend = Router.extend = View.extend = History.extend = extend;
 
     // Throw an error when a URL is needed, and none is supplied.
+    // 当URL是必须的但是未提供的时候爆出错误.
     var urlError = function () {
         throw new Error('A "url" property or function must be specified');
     };
 
-    // Wrap an optional error callback with a fallback error event.
+    // Wrap an optional error callback with a fallback error event..
+    // 包装一个设置的错误回调函数来作为后备错误事件。
     var wrapError = function (model, options) {
         var error = options.error;
         options.error = function (resp) {
